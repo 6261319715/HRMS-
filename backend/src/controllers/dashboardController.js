@@ -1,9 +1,10 @@
 const crypto = require("crypto");
 const { Resend } = require("resend");
-const { and, eq, desc } = require("drizzle-orm");
+const { and, eq, desc, count } = require("drizzle-orm");
 const { db } = require("../db");
-const { users, attendanceRecords } = require("../db/schema");
+const { users, attendanceRecords, leaveRequests } = require("../db/schema");
 const { createInviteToken } = require("../services/inviteStore");
+const { createNotification, safeNotify } = require("../services/notificationService");
 
 const ALLOWED_STATUSES = ["Present", "Late", "Leave"];
 const todayDate = () => new Date().toISOString().split("T")[0];
@@ -64,12 +65,20 @@ const getDashboardOverview = async (req, res) => {
     const leaveCount = attendanceRows.filter((row) => row.status === "Leave").length;
     const totalEmployees = rowsWithAttendance.length;
 
+    const [pendingLeaveRow] = await db
+      .select({ c: count() })
+      .from(leaveRequests)
+      .where(
+        and(eq(leaveRequests.organizationName, currentUser.organizationName), eq(leaveRequests.status, "pending"))
+      );
+    const pendingLeaveRequests = Number(pendingLeaveRow?.c ?? 0);
+
     return res.status(200).json({
       organization_name: currentUser.organizationName,
       kpis: {
         total_employees: totalEmployees,
         present_today: presentCount,
-        pending_leaves: leaveCount,
+        pending_leaves: pendingLeaveRequests,
         open_invites: Math.max(0, totalEmployees < 8 ? 8 - totalEmployees : 0),
       },
       attendance_stats: {
@@ -88,7 +97,7 @@ const getDashboardOverview = async (req, res) => {
         },
         {
           title: "Leave approvals pending",
-          subtitle: `${leaveCount} leave request(s) pending review`,
+          subtitle: `${pendingLeaveRequests} leave request(s) awaiting your review`,
         },
       ],
       recent_members: rowsWithAttendance.slice(0, 5).map((orgUser) => ({
@@ -194,6 +203,20 @@ const markAttendance = async (req, res) => {
           checkOut,
         },
       });
+
+    const targetId = Number(user_id);
+    if (targetId !== req.user.id) {
+      await safeNotify(async () => {
+        await createNotification({
+          userId: targetId,
+          organizationName: currentUser.organizationName,
+          type: "attendance_marked",
+          title: `Attendance: ${status}`,
+          body: `${date} · Marked by ${currentUser.name}`,
+          linkPath: "/attendance",
+        });
+      });
+    }
 
     return res.status(200).json({ message: "Attendance updated successfully" });
   } catch (error) {

@@ -69,7 +69,7 @@ const DashboardPage = () => {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Total Employees" value={overview?.kpis?.total_employees ?? "-"} hint="In organization" />
           <KpiCard label="Present Today" value={overview?.kpis?.present_today ?? "-"} hint="Active attendance" />
-          <KpiCard label="Pending Leaves" value={overview?.kpis?.pending_leaves ?? "-"} hint="Needs action" />
+          <KpiCard label="Pending Leaves" value={overview?.kpis?.pending_leaves ?? "-"} hint="Requests awaiting approval" />
           <KpiCard label="Open Invites" value={overview?.kpis?.open_invites ?? "-"} hint="Share invite link" />
         </div>
 

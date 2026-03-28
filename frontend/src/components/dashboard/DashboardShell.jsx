@@ -1,15 +1,62 @@
-import { useState } from "react";
-import { Bell, ChevronDown, LogOut, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, ChevronDown, Loader2, LogOut, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppSidebar from "./AppSidebar";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
+import apiClient from "../../api/apiClient";
+
+const formatAgoShort = (iso) => {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+};
 
 const DashboardShell = ({ title, subtitle, actions, children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [bellLoading, setBellLoading] = useState(false);
+  const [bellItems, setBellItems] = useState([]);
+  const bellRef = useRef(null);
   const { user, logout } = useAuth();
+  const { unreadCount, refreshUnread } = useNotifications();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
+        setBellOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    let cancelled = false;
+    (async () => {
+      setBellLoading(true);
+      try {
+        const res = await apiClient.get("/notifications", { params: { limit: 8 } });
+        if (!cancelled) setBellItems(res.data.notifications || []);
+      } catch {
+        if (!cancelled) setBellItems([]);
+      } finally {
+        if (!cancelled) setBellLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bellOpen]);
 
   const onLogout = () => {
     logout();
@@ -29,13 +76,78 @@ const DashboardShell = ({ title, subtitle, actions, children }) => {
         <main className="w-full">
           <div className="border-b border-gray-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
             <div className="mx-auto flex max-w-6xl items-center justify-end gap-2">
-              <button
-                className="rounded-md border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
-                onClick={() => navigate("/notifications")}
-                type="button"
-              >
-                <Bell size={16} />
-              </button>
+              <div className="relative" ref={bellRef}>
+                <button
+                  className="relative rounded-md border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
+                  onClick={() => setBellOpen((o) => !o)}
+                  type="button"
+                  aria-label="Notifications"
+                >
+                  <Bell size={16} />
+                  {unreadCount > 0 ? (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  ) : null}
+                </button>
+                {bellOpen ? (
+                  <div className="absolute right-0 z-40 mt-2 w-[min(100vw-2rem,20rem)] rounded-xl border border-gray-200 bg-white shadow-xl">
+                    <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Notifications</p>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                        onClick={() => {
+                          setBellOpen(false);
+                          navigate("/notifications");
+                        }}
+                      >
+                        View all
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto py-1">
+                      {bellLoading ? (
+                        <div className="flex justify-center py-6 text-gray-400">
+                          <Loader2 className="animate-spin" size={20} />
+                        </div>
+                      ) : bellItems.length === 0 ? (
+                        <p className="px-3 py-6 text-center text-xs text-gray-500">No notifications yet</p>
+                      ) : (
+                        bellItems.map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            className={`flex w-full gap-2 border-b border-gray-50 px-3 py-2.5 text-left last:border-0 hover:bg-gray-50 ${
+                              n.read ? "" : "bg-blue-50/40"
+                            }`}
+                            onClick={async () => {
+                              if (!n.read) {
+                                try {
+                                  await apiClient.patch(`/notifications/${n.id}/read`);
+                                  await refreshUnread();
+                                } catch {
+                                  /* ignore */
+                                }
+                              }
+                              setBellOpen(false);
+                              if (n.link_path) navigate(n.link_path);
+                              else navigate("/notifications");
+                            }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className={`truncate text-sm ${n.read ? "text-gray-700" : "font-medium text-gray-900"}`}>
+                                {n.title}
+                              </p>
+                              {n.body ? <p className="truncate text-xs text-gray-500">{n.body}</p> : null}
+                            </div>
+                            <span className="shrink-0 text-[10px] text-gray-400">{formatAgoShort(n.created_at)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="relative">
                 <button

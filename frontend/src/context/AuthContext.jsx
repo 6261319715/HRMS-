@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import apiClient from "../api/apiClient";
 
 const AuthContext = createContext(null);
@@ -46,13 +46,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!token) return null;
     const response = await apiClient.get("/auth/profile");
     setUser(response.data.user);
     localStorage.setItem("user", JSON.stringify(response.data.user));
     return response.data.user;
-  };
+  }, [token]);
 
   const logout = () => {
     clearAuth();
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       fetchProfile,
     }),
-    [token, user, loading]
+    [token, user, loading, fetchProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

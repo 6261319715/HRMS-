@@ -7,7 +7,10 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:ensure-leaves": "node scripts/applyLeaveRequestsTable.js",
+    "db:ensure-notifications": "node scripts/applyNotificationsTable.js",
+    "db:ensure-payroll": "node scripts/applyPayrollTable.js"
   },
   "keywords": [
     "hrms",
@@ -26,6 +29,7 @@
     "express": "^5.2.1",
     "express-validator": "^7.3.1",
     "jsonwebtoken": "^9.0.3",
+    "pdfkit": "^0.15.0",
     "pg": "^8.20.0",
     "resend": "^6.9.4"
   },

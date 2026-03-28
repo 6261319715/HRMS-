@@ -5,6 +5,9 @@ const dotenv = require("dotenv");
 dotenv.config();
 const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const leaveRoutes = require("./routes/leaveRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const payrollRoutes = require("./routes/payrollRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,6 +45,9 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api", employeeRoutes);
+app.use("/api/leaves", leaveRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console

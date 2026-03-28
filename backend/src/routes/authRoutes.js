@@ -1,5 +1,5 @@
 const express = require("express");
-const { signup, login, profile, inviteSignup } = require("../controllers/authController");
+const { signup, login, profile, inviteSignup, updateProfile, changePassword } = require("../controllers/authController");
 const { getDashboardOverview, getAttendanceSheet, markAttendance, generateInviteLink } = require("../controllers/dashboardController");
 const { authMiddleware } = require("../middleware/authMiddleware");
 const { requireRoles } = require("../middleware/roleMiddleware");
@@ -11,6 +11,8 @@ router.post("/signup", signupValidator, signup);
 router.post("/invite-signup", inviteSignupValidator, inviteSignup);
 router.post("/login", loginValidator, login);
 router.get("/profile", authMiddleware, profile);
+router.put("/profile", authMiddleware, updateProfile);
+router.post("/change-password", authMiddleware, changePassword);
 router.get("/dashboard-overview", authMiddleware, requireRoles("admin"), getDashboardOverview);
 router.get("/attendance-sheet", authMiddleware, getAttendanceSheet);
 router.post("/attendance/mark", authMiddleware, requireRoles("admin"), markAttendance);

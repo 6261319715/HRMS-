@@ -17,92 +17,101 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
-const menuSections = [
-  {
-    key: "profile",
-    label: "Profile",
-    icon: User,
-    items: [{ label: "My Profile", to: "/profile" }],
-    roles: ["employee", "admin"],
-  },
-  {
-    key: "dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    items: [
-      { label: "Overview", to: "/dashboard" },
-      { label: "Analytics", to: "/dashboard/analytics" },
-    ],
-    roles: ["admin"],
-  },
-  {
-    key: "employees",
-    label: "Employees",
-    icon: Users,
-    items: [
-      { label: "All Employees", to: "/employees" },
-      { label: "Teams", to: "/employees/teams" },
-    ],
-    roles: ["admin"],
-  },
-  {
-    key: "attendance",
-    label: "Attendance",
-    icon: CalendarCheck,
-    items: [
-      { label: "Attendance Sheet", to: "/attendance" },
-      { label: "Regularization", to: "/attendance/regularization" },
-    ],
-    roles: ["admin", "employee"],
-  },
-  {
-    key: "leaves",
-    label: "Leaves",
-    icon: CalendarClock,
-    items: [
-      { label: "Leave Requests", to: "/leaves" },
-      { label: "Leave Policy", to: "/leaves/policy" },
-    ],
-    roles: ["admin", "employee"],
-  },
-  {
-    key: "notifications",
-    label: "Notifications",
-    icon: Bell,
-    items: [{ label: "Inbox", to: "/notifications" }],
-    roles: ["employee", "admin"],
-  },
-  {
-    key: "payroll",
-    label: "Payroll",
-    icon: Wallet,
-    items: [
-      { label: "Salary Runs", to: "/payroll" },
-      { label: "Payslips", to: "/payroll/payslips" },
-    ],
-    roles: ["admin"],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: Settings,
-    items: [
-      { label: "Organization", to: "/settings" },
-      { label: "Preferences", to: "/settings/preferences" },
-    ],
-    roles: ["admin"],
-  },
-];
-
 const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCollapsed }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const role = user?.role || "employee";
+
+  const menuSections = useMemo(
+    () => [
+      {
+        key: "profile",
+        label: "Profile",
+        icon: User,
+        items: [{ label: "My Profile", to: "/profile" }],
+        roles: ["employee", "admin"],
+      },
+      {
+        key: "dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        items: [
+          { label: "Overview", to: "/dashboard" },
+          { label: "Analytics", to: "/dashboard/analytics" },
+        ],
+        roles: ["admin"],
+      },
+      {
+        key: "employees",
+        label: "Employees",
+        icon: Users,
+        items: [
+          { label: "All Employees", to: "/employees" },
+          { label: "Teams", to: "/employees/teams" },
+        ],
+        roles: ["admin"],
+      },
+      {
+        key: "attendance",
+        label: "Attendance",
+        icon: CalendarCheck,
+        items: [
+          { label: "Attendance Sheet", to: "/attendance" },
+          { label: "Regularization", to: "/attendance/regularization" },
+        ],
+        roles: ["admin", "employee"],
+      },
+      {
+        key: "leaves",
+        label: "Leaves",
+        icon: CalendarClock,
+        items:
+          role === "admin"
+            ? [
+                { label: "Manage requests", to: "/leaves" },
+                { label: "Leave policy", to: "/leaves/policy" },
+              ]
+            : [{ label: "Apply leave", to: "/leaves" }],
+        roles: ["admin", "employee"],
+      },
+      {
+        key: "notifications",
+        label: "Notifications",
+        icon: Bell,
+        items: [{ label: "Inbox", to: "/notifications" }],
+        roles: ["employee", "admin"],
+      },
+      {
+        key: "payroll",
+        label: "Payroll",
+        icon: Wallet,
+        items:
+          role === "admin"
+            ? [
+                { label: "Salary runs", to: "/payroll" },
+                { label: "Payslips", to: "/payroll/payslips" },
+              ]
+            : [{ label: "My payslips", to: "/payroll/payslips" }],
+        roles: ["admin", "employee"],
+      },
+      {
+        key: "settings",
+        label: "Settings",
+        icon: Settings,
+        items: [
+          { label: "Organization", to: "/settings" },
+          { label: "Preferences", to: "/settings/preferences" },
+        ],
+        roles: ["admin"],
+      },
+    ],
+    [role]
+  );
   const visibleSections = menuSections.filter((section) => {
     if (!section.roles) return true;
     if (role === "employee") {
-      return ["profile", "attendance", "leaves", "notifications"].includes(section.key);
+      return ["profile", "attendance", "leaves", "notifications", "payroll"].includes(section.key);
     }
     return section.roles.includes(role);
   });

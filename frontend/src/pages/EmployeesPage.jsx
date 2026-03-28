@@ -1,31 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Pencil, Trash2, Search } from "lucide-react";
+import { Eye, Pencil, Trash2, Search, RefreshCw } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import apiClient from "../api/apiClient";
+
+const defaultEditForm = {
+  name: "",
+  email: "",
+  role: "employee",
+  status: "Active",
+  mobile_number: "",
+};
 
 const EmployeesPage = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [editEmployee, setEditEmployee] = useState(null);
+  const [editForm, setEditForm] = useState(defaultEditForm);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+  const [statusConfirm, setStatusConfirm] = useState(null);
+
+  const loadEmployees = async ({ withLoader = true } = {}) => {
+    if (withLoader) setLoading(true);
+    setError("");
+    try {
+      const response = await apiClient.get("/employees");
+      setEmployees(response.data.employees || []);
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load employees");
+    } finally {
+      if (withLoader) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadEmployees = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const response = await apiClient.get("/employees");
-        setEmployees(response.data.employees || []);
-      } catch (err) {
-        setError(err?.response?.data?.message || "Failed to load employees");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadEmployees();
   }, []);
 
@@ -60,6 +76,92 @@ const EmployeesPage = () => {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  const handleView = (employee) => {
+    setSelectedEmployee(employee);
+  };
+
+  const handleEdit = (employee) => {
+    setEditEmployee(employee);
+    setEditForm({
+      name: employee.name || "",
+      email: employee.email || "",
+      role: employee.role || "employee",
+      status: employee.status || "Active",
+      mobile_number: employee.mobile_number || "",
+    });
+  };
+
+  const handleDelete = async (employeeId) => {
+    const ok = window.confirm("Are you sure you want to delete this employee?");
+    if (!ok) return;
+
+    setDeletingId(employeeId);
+    setError("");
+    setInfo("");
+    try {
+      await apiClient.delete(`/employees/${employeeId}`);
+      setInfo("Employee deleted successfully.");
+      await loadEmployees({ withLoader: false });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to delete employee");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const requestStatusChange = (employee) => {
+    if (employee.role === "admin") return;
+    const nextStatus = employee.status === "Active" ? "Inactive" : "Active";
+    setStatusConfirm({ employee, nextStatus });
+  };
+
+  const cancelStatusChange = () => {
+    setStatusConfirm(null);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!statusConfirm) return;
+    const { employee, nextStatus } = statusConfirm;
+    setStatusConfirm(null);
+
+    const previous = employees;
+    setEmployees((prev) =>
+      prev.map((e) => (e.id === employee.id ? { ...e, status: nextStatus } : e))
+    );
+    setError("");
+    setInfo("");
+    setStatusUpdatingId(employee.id);
+
+    try {
+      await apiClient.put(`/employees/${employee.id}`, { status: nextStatus });
+      setInfo(`Status updated to ${nextStatus}.`);
+    } catch (err) {
+      setEmployees(previous);
+      setError(err?.response?.data?.message || "Failed to update status");
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault();
+    if (!editEmployee) return;
+
+    setSavingEdit(true);
+    setError("");
+    setInfo("");
+    try {
+      await apiClient.put(`/employees/${editEmployee.id}`, editForm);
+      setInfo("Employee updated successfully.");
+      setEditEmployee(null);
+      await loadEmployees({ withLoader: false });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to update employee");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <DashboardShell title="All Employees" subtitle="Manage employee directory, roles, and workforce overview.">
@@ -99,6 +201,7 @@ const EmployeesPage = () => {
         ) : null}
 
         {error ? <p className="alert alert-error">{error}</p> : null}
+        {info ? <p className="alert alert-success">{info}</p> : null}
 
         {!loading && !error ? (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -143,21 +246,23 @@ const EmployeesPage = () => {
                       {employee.join_date ? new Date(employee.join_date).toLocaleDateString() : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={
-                          employee.status === "Active"
-                            ? "status-pill status-present"
-                            : "status-pill status-inactive"
-                        }
-                      >
-                        {employee.status}
-                      </span>
+                      <EmployeeStatusRow
+                        employee={employee}
+                        busy={statusUpdatingId === employee.id}
+                        onToggle={() => requestStatusChange(employee)}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <ActionButton icon={<Eye size={14} />} label="View" />
-                        <ActionButton icon={<Pencil size={14} />} label="Edit" />
-                        <ActionButton icon={<Trash2 size={14} />} label="Delete" danger />
+                        <ActionButton icon={<Eye size={14} />} label="View" onClick={() => handleView(employee)} />
+                        <ActionButton icon={<Pencil size={14} />} label="Edit" onClick={() => handleEdit(employee)} />
+                        <ActionButton
+                          icon={<Trash2 size={14} />}
+                          label={deletingId === employee.id ? "Deleting..." : "Delete"}
+                          danger
+                          disabled={deletingId === employee.id}
+                          onClick={() => handleDelete(employee.id)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -204,22 +309,190 @@ const EmployeesPage = () => {
           </div>
         ) : null}
       </div>
+
+      {selectedEmployee ? (
+        <Modal title="Employee Details" onClose={() => setSelectedEmployee(null)}>
+          <div className="space-y-2 text-sm text-gray-700">
+            <p><span className="font-medium text-gray-900">Name:</span> {selectedEmployee.name}</p>
+            <p><span className="font-medium text-gray-900">Email:</span> {selectedEmployee.email}</p>
+            <p><span className="font-medium text-gray-900">Role:</span> {selectedEmployee.role}</p>
+            <p><span className="font-medium text-gray-900">Department:</span> {selectedEmployee.department}</p>
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-gray-900">Status:</span>
+              <StatusBadge status={selectedEmployee.status} />
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">Joined:</span>{" "}
+              {selectedEmployee.join_date ? new Date(selectedEmployee.join_date).toLocaleDateString() : "-"}
+            </p>
+            <p><span className="font-medium text-gray-900">Mobile:</span> {selectedEmployee.mobile_number || "-"}</p>
+          </div>
+        </Modal>
+      ) : null}
+
+      {statusConfirm ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            aria-label="Close dialog"
+            className="absolute inset-0 bg-gray-900/50 backdrop-blur-[2px] transition-opacity"
+            onClick={cancelStatusChange}
+            type="button"
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl ring-1 ring-black/5 transition-all duration-200">
+            <h3 className="text-lg font-semibold text-gray-900">Change employee status</h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              Are you sure you want to change status?
+            </p>
+            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              <span className="font-medium text-gray-900">{statusConfirm.employee.name}</span>
+              <span className="mx-1.5 text-gray-400">→</span>
+              <StatusBadge status={statusConfirm.nextStatus} />
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:shadow"
+                onClick={cancelStatusChange}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow-md active:scale-[0.98]"
+                onClick={() => void confirmStatusChange()}
+                type="button"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editEmployee ? (
+        <Modal title="Edit Employee" onClose={() => setEditEmployee(null)}>
+          <form className="space-y-3" onSubmit={handleEditSubmit}>
+            <input
+              className="input"
+              placeholder="Name"
+              value={editForm.name}
+              onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
+            />
+            <input
+              className="input"
+              type="email"
+              placeholder="Email"
+              value={editForm.email}
+              onChange={(event) => setEditForm((prev) => ({ ...prev, email: event.target.value }))}
+            />
+            <input
+              className="input"
+              placeholder="Mobile number"
+              maxLength={10}
+              value={editForm.mobile_number}
+              onChange={(event) => setEditForm((prev) => ({ ...prev, mobile_number: event.target.value }))}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                className="input"
+                value={editForm.role}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value }))}
+              >
+                <option value="employee">Employee</option>
+                <option value="admin">Admin</option>
+              </select>
+              <select
+                className="input"
+                value={editForm.status}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value }))}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button className="btn-secondary px-3 py-2 text-sm" onClick={() => setEditEmployee(null)} type="button">
+                Cancel
+              </button>
+              <button className="btn-action px-3 py-2 text-sm" disabled={savingEdit} type="submit">
+                {savingEdit ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
     </DashboardShell>
   );
 };
 
-const ActionButton = ({ icon, label, danger = false }) => (
+const EmployeeStatusRow = ({ employee, onToggle, busy }) => {
+  const isAdmin = employee.role === "admin";
+  const isActive = employee.status === "Active";
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <StatusBadge status={employee.status} />
+      <button
+        aria-busy={busy}
+        aria-label={isActive ? "Set inactive" : "Set active"}
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-600"
+        disabled={isAdmin || busy}
+        onClick={onToggle}
+        title={isAdmin ? "Admin account status cannot be toggled here" : "Toggle Active / Inactive"}
+        type="button"
+      >
+        {busy ? (
+          <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-600" />
+        ) : (
+          <span className="tabular-nums">{isActive ? "Deactivate" : "Activate"}</span>
+        )}
+      </button>
+    </div>
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  const active = status === "Active";
+  return (
+    <span
+      className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors duration-200 ${
+        active
+          ? "bg-green-100 text-green-600 ring-1 ring-green-200/80"
+          : "bg-red-100 text-red-500 ring-1 ring-red-200/80"
+      }`}
+    >
+      {status}
+    </span>
+  );
+};
+
+const ActionButton = ({ icon, label, danger = false, onClick, disabled = false }) => (
   <button
     className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition ${
       danger
         ? "border-red-800/80 text-red-300 hover:bg-red-900/20"
         : "border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-    }`}
+    } disabled:cursor-not-allowed disabled:opacity-60`}
+    disabled={disabled}
+    onClick={onClick}
     type="button"
   >
     {icon}
     {label}
   </button>
+);
+
+const Modal = ({ title, children, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <button className="text-sm text-gray-500 hover:text-gray-700" onClick={onClose} type="button">
+          Close
+        </button>
+      </div>
+      {children}
+    </div>
+  </div>
 );
 
 export default EmployeesPage;
