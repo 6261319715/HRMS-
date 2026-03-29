@@ -11,9 +11,18 @@ const payrollRoutes = require("./routes/payrollRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+const normalizeOrigin = (value) => (value || "").replace(/\/$/, "").trim();
+
 const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
-  .map((origin) => origin.trim());
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
+
+const allowVercelApp =
+  process.env.CORS_ALLOW_VERCEL === "true" || process.env.CORS_ALLOW_VERCEL === "1";
+const vercelOriginPattern = /^https:\/\/[\w.-]+\.vercel\.app$/i;
+
 const isLocalhostOrigin = (origin) => /^https?:\/\/localhost(?::\d+)?$/i.test(origin);
 
 app.use(
@@ -24,18 +33,29 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      const normalized = normalizeOrigin(origin);
+
+      if (allowedOrigins.includes(normalized)) {
+        return callback(null, true);
+      }
+
+      if (allowVercelApp && vercelOriginPattern.test(normalized)) {
         return callback(null, true);
       }
 
       // In local development, Vite can shift ports (5173, 5174, 5175, ...).
-      if (process.env.NODE_ENV !== "production" && isLocalhostOrigin(origin)) {
+      if (process.env.NODE_ENV !== "production" && isLocalhostOrigin(normalized)) {
         return callback(null, true);
       }
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      // Avoid passing Error into cors — it can skip CORS headers on preflight and confuse the browser.
+      // eslint-disable-next-line no-console
+      console.warn(`CORS blocked for origin: ${origin}`);
+      return callback(null, false);
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(express.json());
