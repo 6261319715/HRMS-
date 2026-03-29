@@ -1,0 +1,24 @@
+# Render Blueprint: HRMS API (Express in /backend)
+# Dashboard: New + Blueprint → connect repo → secrets add करें (DATABASE_URL, JWT_SECRET, …)
+services:
+  - type: web
+    name: hrms-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false

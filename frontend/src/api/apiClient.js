@@ -1,12 +1,9 @@
 import axios from "axios";
-
-const defaultApiBase =
-  import.meta.env.PROD
-    ? "/api"
-    : "http://localhost:5000/api";
+import { API_BASE_URL } from "../config/api";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || defaultApiBase,
+  baseURL: `${API_BASE_URL}/api`,
+  timeout: 15000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -16,5 +13,19 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // eslint-disable-next-line no-console
+    console.error("API request failed:", {
+      method: error?.config?.method,
+      url: error?.config?.url,
+      status: error?.response?.status,
+      message: error?.response?.data?.message || error.message,
+    });
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;

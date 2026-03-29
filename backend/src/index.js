@@ -35,6 +35,7 @@ app.use(
 
       return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
+    credentials: true,
   })
 );
 app.use(express.json());
@@ -49,7 +50,8 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payroll", payrollRoutes);
 
-app.listen(PORT, () => {
+const host = process.env.HOST || "0.0.0.0";
+app.listen(PORT, host, () => {
   // eslint-disable-next-line no-console
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on ${host}:${PORT}`);
 });
