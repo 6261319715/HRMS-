@@ -1,9 +1,14 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 
+// Render free tier cold starts often exceed 15s; override via VITE_API_TIMEOUT_MS if needed.
+const parsedTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const timeoutMs =
+  Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 90_000;
+
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api`,
-  timeout: 15000,
+  timeout: timeoutMs,
 });
 
 apiClient.interceptors.request.use((config) => {
