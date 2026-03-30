@@ -6,13 +6,11 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
-  User,
   Users,
   CalendarCheck,
   CalendarClock,
   Wallet,
   Settings,
-  Bell,
   PanelLeft,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -25,13 +23,6 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
 
   const menuSections = useMemo(
     () => [
-      {
-        key: "profile",
-        label: "Profile",
-        icon: User,
-        items: [{ label: "My Profile", to: "/profile" }],
-        roles: ["employee", "admin"],
-      },
       {
         key: "dashboard",
         label: "Dashboard",
@@ -76,13 +67,6 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
         roles: ["admin", "employee"],
       },
       {
-        key: "notifications",
-        label: "Notifications",
-        icon: Bell,
-        items: [{ label: "Inbox", to: "/notifications" }],
-        roles: ["employee", "admin"],
-      },
-      {
         key: "payroll",
         label: "Payroll",
         icon: Wallet,
@@ -111,7 +95,7 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
   const visibleSections = menuSections.filter((section) => {
     if (!section.roles) return true;
     if (role === "employee") {
-      return ["profile", "attendance", "leaves", "notifications", "payroll"].includes(section.key);
+      return ["attendance", "leaves", "payroll"].includes(section.key);
     }
     return section.roles.includes(role);
   });

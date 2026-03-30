@@ -48,6 +48,22 @@ body {
   color: #9ca3af;
 }
 
+.input-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+
+.input-error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+
+.field-error {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: #b91c1c;
+}
+
 .btn-primary {
   width: 100%;
   border: none;

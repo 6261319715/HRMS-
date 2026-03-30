@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthLayout from "../components/AuthLayout";
 import apiClient from "../api/apiClient";
+import { validateSignupForm } from "../utils/authFormValidation";
 
 const initialState = {
   name: "",
@@ -14,6 +15,7 @@ const initialState = {
 
 const SignupPage = () => {
   const [formData, setFormData] = useState(initialState);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const { signup, loading } = useAuth();
@@ -22,64 +24,82 @@ const SignupPage = () => {
   const token = new URLSearchParams(location.search).get("token");
   const isInviteSignup = Boolean(token);
 
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(token);
-  }, [token]);
-
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "mobile_number") {
+      const digits = value.replace(/\D/g, "").slice(0, 10);
+      setFormData((prev) => ({ ...prev, [name]: digits }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
-  const validate = () => {
-    const { name, email, password, organization_name, mobile_number } = formData;
-    const missingAdminFields = !isInviteSignup && !organization_name;
-
-    if (!name || !email || !password || !mobile_number || missingAdminFields) {
-      return "All fields are required";
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return "Please enter a valid email";
-    }
-
-    if (!/^\d{10}$/.test(mobile_number)) {
-      return "Mobile number must be numeric and exactly 10 digits";
-    }
-
-    return "";
-  };
+  const buildPayload = () => ({
+    name: formData.name.trim(),
+    email: formData.email.trim(),
+    password: formData.password,
+    organization_name: formData.organization_name.trim(),
+    mobile_number: formData.mobile_number.replace(/\D/g, ""),
+  });
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
     setSuccess("");
 
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+    const validation = validateSignupForm(formData, { isInvite: isInviteSignup });
+    if (Object.keys(validation).length > 0) {
+      setFieldErrors(validation);
       return;
     }
+    setFieldErrors({});
+
+    const payload = buildPayload();
 
     try {
       if (isInviteSignup) {
         await apiClient.post("/auth/invite-signup", {
           token,
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          mobile_number: formData.mobile_number,
+          name: payload.name,
+          email: payload.email,
+          password: payload.password,
+          mobile_number: payload.mobile_number,
         });
         setSuccess("Employee signup successful. Please login.");
       } else {
-        await signup(formData);
+        await signup({
+          name: payload.name,
+          email: payload.email,
+          password: payload.password,
+          organization_name: payload.organization_name,
+          mobile_number: payload.mobile_number,
+        });
         setSuccess("Signup successful. Please login.");
       }
       setTimeout(() => navigate("/login"), 800);
     } catch (err) {
-      setError(err?.response?.data?.message || "Signup failed");
+      const data = err?.response?.data;
+      const validationErrors = data?.errors;
+      const next = {};
+      if (Array.isArray(validationErrors)) {
+        for (const item of validationErrors) {
+          if (item.path && !next[item.path]) {
+            next[item.path] = typeof item.msg === "string" ? item.msg : "Invalid value";
+          }
+        }
+      }
+      if (Object.keys(next).length > 0) {
+        setFieldErrors(next);
+        setError("");
+      } else {
+        setError(data?.message || "Signup failed");
+      }
     }
   };
 
@@ -111,50 +131,92 @@ const SignupPage = () => {
         <p className="alert alert-success mb-4">{success}</p>
       ) : null}
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <input
-          className="input"
-          placeholder="Full name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          autoComplete="name"
-        />
-        <input
-          className="input"
-          type="email"
-          placeholder="Email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          autoComplete="email"
-        />
-        <input
-          className="input"
-          type="password"
-          placeholder="Password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          autoComplete="new-password"
-        />
-        {!isInviteSignup ? (
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+        <div>
           <input
-            className="input"
-            placeholder="Organization name"
-            name="organization_name"
-            value={formData.organization_name}
+            className={`input ${fieldErrors.name ? "input-error" : ""}`}
+            placeholder="Full name"
+            name="name"
+            value={formData.name}
             onChange={handleChange}
+            autoComplete="name"
+            aria-invalid={Boolean(fieldErrors.name)}
           />
+          {fieldErrors.name ? (
+            <p className="field-error" role="alert">
+              {fieldErrors.name}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <input
+            className={`input ${fieldErrors.email ? "input-error" : ""}`}
+            type="email"
+            placeholder="Email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            autoComplete="email"
+            aria-invalid={Boolean(fieldErrors.email)}
+          />
+          {fieldErrors.email ? (
+            <p className="field-error" role="alert">
+              {fieldErrors.email}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <input
+            className={`input ${fieldErrors.password ? "input-error" : ""}`}
+            type="password"
+            placeholder="Password (min. 6 characters)"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            autoComplete="new-password"
+            aria-invalid={Boolean(fieldErrors.password)}
+          />
+          {fieldErrors.password ? (
+            <p className="field-error" role="alert">
+              {fieldErrors.password}
+            </p>
+          ) : null}
+        </div>
+        {!isInviteSignup ? (
+          <div>
+            <input
+              className={`input ${fieldErrors.organization_name ? "input-error" : ""}`}
+              placeholder="Organization name"
+              name="organization_name"
+              value={formData.organization_name}
+              onChange={handleChange}
+              aria-invalid={Boolean(fieldErrors.organization_name)}
+            />
+            {fieldErrors.organization_name ? (
+              <p className="field-error" role="alert">
+                {fieldErrors.organization_name}
+              </p>
+            ) : null}
+          </div>
         ) : null}
-        <input
-          className="input"
-          placeholder="Mobile number"
-          name="mobile_number"
-          value={formData.mobile_number}
-          onChange={handleChange}
-          maxLength={10}
-        />
+        <div>
+          <input
+            className={`input ${fieldErrors.mobile_number ? "input-error" : ""}`}
+            placeholder="Mobile number (10 digits)"
+            name="mobile_number"
+            value={formData.mobile_number}
+            onChange={handleChange}
+            inputMode="numeric"
+            autoComplete="tel"
+            maxLength={10}
+            aria-invalid={Boolean(fieldErrors.mobile_number)}
+          />
+          {fieldErrors.mobile_number ? (
+            <p className="field-error" role="alert">
+              {fieldErrors.mobile_number}
+            </p>
+          ) : null}
+        </div>
         <button className="btn-primary" disabled={loading} type="submit">
           {loading ? "Creating account..." : "Signup"}
         </button>

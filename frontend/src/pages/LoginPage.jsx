@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthLayout from "../components/AuthLayout";
+import { validateLoginForm } from "../utils/authFormValidation";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -16,23 +18,46 @@ const LoginPage = () => {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
-
-    if (!formData.email || !formData.password) {
-      setError("Email and password are required");
+    const trimmed = {
+      email: formData.email.trim(),
+      password: formData.password,
+    };
+    const validation = validateLoginForm(trimmed);
+    if (Object.keys(validation).length > 0) {
+      setFieldErrors(validation);
       return;
     }
+    setFieldErrors({});
 
     try {
-      const response = await login(formData);
+      const response = await login(trimmed);
       const targetPath = response?.user?.role === "employee" ? "/attendance" : "/dashboard";
       navigate(targetPath);
     } catch (err) {
-      setError(err?.response?.data?.message || "Login failed");
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message;
+      const validationErrors = err?.response?.data?.errors;
+      if (Array.isArray(validationErrors) && validationErrors.length > 0) {
+        const next = {};
+        for (const item of validationErrors) {
+          if (item.path && !next[item.path]) {
+            next[item.path] = typeof item.msg === "string" ? item.msg : "Invalid value";
+          }
+        }
+        setFieldErrors((prev) => ({ ...prev, ...next }));
+      }
+      setError(message || (status === 401 ? "Invalid email or password" : "Login failed"));
     }
   };
 
@@ -53,25 +78,43 @@ const LoginPage = () => {
     >
       {error ? <p className="alert alert-error mb-4">{error}</p> : null}
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <input
-          className="input"
-          type="email"
-          placeholder="Email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          autoComplete="email"
-        />
-        <input
-          className="input"
-          type="password"
-          placeholder="Password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          autoComplete="current-password"
-        />
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+        <div>
+          <input
+            className={`input ${fieldErrors.email ? "input-error" : ""}`}
+            type="email"
+            placeholder="Email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            autoComplete="email"
+            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
+          />
+          {fieldErrors.email ? (
+            <p id="login-email-error" className="field-error" role="alert">
+              {fieldErrors.email}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <input
+            className={`input ${fieldErrors.password ? "input-error" : ""}`}
+            type="password"
+            placeholder="Password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            autoComplete="current-password"
+            aria-invalid={Boolean(fieldErrors.password)}
+            aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
+          />
+          {fieldErrors.password ? (
+            <p id="login-password-error" className="field-error" role="alert">
+              {fieldErrors.password}
+            </p>
+          ) : null}
+        </div>
         <button className="btn-primary" disabled={loading} type="submit">
           {loading ? "Signing in..." : "Login"}
         </button>
