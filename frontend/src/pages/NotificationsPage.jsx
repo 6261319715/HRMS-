@@ -4,6 +4,7 @@ import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import apiClient from "../api/apiClient";
 import { useNotifications } from "../context/NotificationContext";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const formatAgo = (iso) => {
   if (!iso) return "";
@@ -26,6 +27,7 @@ const NotificationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+  useAnnounceFeedback({ error });
 
   const load = useCallback(async () => {
     setError("");
@@ -89,7 +91,17 @@ const NotificationsPage = () => {
           Loading…
         </div>
       ) : error ? (
-        <p className="text-sm text-red-600">{error}</p>
+        <div className="rounded-xl border border-dashed border-red-200 bg-red-50/80 px-4 py-8 text-center">
+          <p className="text-sm font-medium text-red-900">Couldn&apos;t load notifications</p>
+          <p className="mt-1 text-xs text-red-800/90">{error}</p>
+          <button
+            type="button"
+            onClick={() => load()}
+            className="btn-action mt-4 inline-flex px-4 py-2 text-sm"
+          >
+            Try again
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-10 text-center">
           <Bell className="mx-auto mb-2 text-gray-400" size={28} />

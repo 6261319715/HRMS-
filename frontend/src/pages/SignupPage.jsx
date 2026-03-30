@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import AuthLayout from "../components/AuthLayout";
 import apiClient from "../api/apiClient";
 import { validateSignupForm } from "../utils/authFormValidation";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const initialState = {
   name: "",
@@ -23,6 +24,7 @@ const SignupPage = () => {
   const location = useLocation();
   const token = new URLSearchParams(location.search).get("token");
   const isInviteSignup = Boolean(token);
+  useAnnounceFeedback({ error, success });
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -126,11 +128,6 @@ const SignupPage = () => {
         </span>
       }
     >
-      {error ? <p className="alert alert-error mb-4">{error}</p> : null}
-      {success ? (
-        <p className="alert alert-success mb-4">{success}</p>
-      ) : null}
-
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div>
           <input

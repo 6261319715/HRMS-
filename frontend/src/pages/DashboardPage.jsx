@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/apiClient";
 import DashboardShell from "../components/dashboard/DashboardShell";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const DashboardPage = () => {
   const { user, fetchProfile, logout } = useAuth();
@@ -11,6 +12,7 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState(null);
   const navigate = useNavigate();
+  useAnnounceFeedback({ error, success: info });
 
   useEffect(() => {
     const load = async () => {
@@ -36,6 +38,8 @@ const DashboardPage = () => {
   };
 
   const handleCopyInvite = async () => {
+    setError("");
+    setInfo("");
     try {
       const recipientEmail = window.prompt("Enter employee email for invite:");
       if (!recipientEmail) {
@@ -48,7 +52,7 @@ const DashboardPage = () => {
       setInfo("Invite email sent and link copied to clipboard.");
     } catch (err) {
       const message = err?.response?.data?.message || "Unable to send invite right now.";
-      setInfo(message);
+      setError(message);
     }
   };
 
@@ -62,8 +66,6 @@ const DashboardPage = () => {
         </button>
       }
     >
-        {error ? <p className="alert alert-error mt-4">{error}</p> : null}
-        {info ? <p className="alert alert-success mt-4">{info}</p> : null}
         {loading ? <p className="mt-4 text-sm text-gray-500">Loading dashboard...</p> : null}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthLayout from "../components/AuthLayout";
 import { validateLoginForm } from "../utils/authFormValidation";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -10,6 +11,7 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  useAnnounceFeedback({ error });
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -76,8 +78,6 @@ const LoginPage = () => {
         </span>
       }
     >
-      {error ? <p className="alert alert-error mb-4">{error}</p> : null}
-
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div>
           <input

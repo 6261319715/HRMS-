@@ -10,7 +10,6 @@ import {
   CalendarCheck,
   CalendarClock,
   Wallet,
-  FileText,
   Settings,
   PanelLeft,
 } from "lucide-react";
@@ -38,11 +37,8 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
         key: "employees",
         label: "Employees",
         icon: Users,
-        items: [
-          { label: "All Employees", to: "/employees" },
-          { label: "Teams", to: "/employees/teams" },
-        ],
-        roles: ["admin"],
+        items: role === "admin" ? [{ label: "All Employees", to: "/employees" }, { label: "Teams", to: "/employees/teams" }] : [{ label: "My Documents", to: "/employees" }],
+        roles: ["admin", "employee"],
       },
       {
         key: "attendance",
@@ -81,13 +77,6 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
         roles: ["admin", "employee"],
       },
       {
-        key: "documents",
-        label: "Documents",
-        icon: FileText,
-        items: [{ label: "Shared docs", to: "/documents" }],
-        roles: ["admin", "employee"],
-      },
-      {
         key: "settings",
         label: "Settings",
         icon: Settings,
@@ -103,7 +92,7 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
   const visibleSections = menuSections.filter((section) => {
     if (!section.roles) return true;
     if (role === "employee") {
-      return ["attendance", "leaves", "payroll", "documents"].includes(section.key);
+      return ["employees", "attendance", "leaves", "payroll"].includes(section.key);
     }
     return section.roles.includes(role);
   });

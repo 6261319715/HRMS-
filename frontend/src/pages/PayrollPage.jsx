@@ -24,6 +24,7 @@ import {
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/apiClient";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const formatInr = (amount) => {
   const n = Number(amount);
@@ -67,6 +68,7 @@ const PayrollPage = () => {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  useAnnounceFeedback({ error, success: info });
 
   const loadPayslips = useCallback(async () => {
     setError("");
@@ -267,13 +269,6 @@ const PayrollPage = () => {
 
   return (
     <DashboardShell title={title} subtitle={subtitle}>
-      {error ? (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
-      ) : null}
-      {info ? (
-        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{info}</p>
-      ) : null}
-
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Loader2 className="animate-spin" size={18} />
