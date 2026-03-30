@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/apiClient";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const ProfilePage = () => {
   const { user, fetchProfile } = useAuth();
@@ -18,6 +19,7 @@ const ProfilePage = () => {
     new_password: "",
     confirm_password: "",
   });
+  useAnnounceFeedback({ error, success: info });
 
   useEffect(() => {
     const load = async () => {
@@ -100,8 +102,6 @@ const ProfilePage = () => {
         </div>
       }
     >
-      {error ? <p className="alert alert-error">{error}</p> : null}
-      {info ? <p className="alert alert-success">{info}</p> : null}
       {loading ? <p className="text-sm text-gray-500">Loading profile...</p> : null}
       {!loading ? (
         <div className="space-y-5">

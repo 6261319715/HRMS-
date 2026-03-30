@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Pencil, Trash2, Search, RefreshCw } from "lucide-react";
+import { Eye, Pencil, Trash2, Search, RefreshCw, FileText, Download, Upload } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import apiClient from "../api/apiClient";
+import { useAuth } from "../context/AuthContext";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const defaultEditForm = {
   name: "",
@@ -12,6 +14,8 @@ const defaultEditForm = {
 };
 
 const EmployeesPage = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,6 +31,13 @@ const EmployeesPage = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const [statusConfirm, setStatusConfirm] = useState(null);
+  const [documentsTarget, setDocumentsTarget] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState(null);
+  const [docForm, setDocForm] = useState({ name: "", file: null });
+  useAnnounceFeedback({ error, success: info });
 
   const loadEmployees = async ({ withLoader = true } = {}) => {
     if (withLoader) setLoading(true);
@@ -93,6 +104,7 @@ const EmployeesPage = () => {
   };
 
   const handleDelete = async (employeeId) => {
+    if (!isAdmin) return;
     const ok = window.confirm("Are you sure you want to delete this employee?");
     if (!ok) return;
 
@@ -111,6 +123,7 @@ const EmployeesPage = () => {
   };
 
   const requestStatusChange = (employee) => {
+    if (!isAdmin) return;
     if (employee.role === "admin") return;
     const nextStatus = employee.status === "Active" ? "Inactive" : "Active";
     setStatusConfirm({ employee, nextStatus });
@@ -146,6 +159,7 @@ const EmployeesPage = () => {
 
   const handleEditSubmit = async (event) => {
     event.preventDefault();
+    if (!isAdmin) return;
     if (!editEmployee) return;
 
     setSavingEdit(true);
@@ -163,10 +177,81 @@ const EmployeesPage = () => {
     }
   };
 
+  const openDocumentsModal = async (employee) => {
+    setDocumentsTarget(employee);
+    setDocForm({ name: "", file: null });
+    setDocuments([]);
+    setDocumentsLoading(true);
+    try {
+      const response = await apiClient.get(`/employees/${employee.id}/documents`);
+      setDocuments(response.data.documents || []);
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load employee documents");
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  const validateDocumentInput = () => {
+    if (!docForm.name.trim()) return "Document name is required";
+    if (!docForm.file) return "Please choose a file";
+    const allowed = ["application/pdf", "image/jpeg", "image/png"];
+    if (!allowed.includes(docForm.file.type)) return "Only PDF, JPG, and PNG files are allowed";
+    if (docForm.file.size > 2 * 1024 * 1024) return "File size exceeds 2MB limit";
+    return "";
+  };
+
+  const handleUploadDocument = async (event) => {
+    event.preventDefault();
+    if (!isAdmin || !documentsTarget) return;
+    const validationError = validateDocumentInput();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setUploadingDoc(true);
+    setError("");
+    try {
+      const payload = new FormData();
+      payload.append("name", docForm.name.trim());
+      payload.append("file", docForm.file);
+      await apiClient.post(`/employees/${documentsTarget.id}/documents`, payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const refreshed = await apiClient.get(`/employees/${documentsTarget.id}/documents`);
+      setDocuments(refreshed.data.documents || []);
+      setInfo("Document uploaded successfully.");
+      setDocForm({ name: "", file: null });
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to upload document");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!isAdmin || !documentsTarget) return;
+    const ok = window.confirm("Delete this document?");
+    if (!ok) return;
+    setDeletingDocId(documentId);
+    try {
+      await apiClient.delete(`/employees/${documentsTarget.id}/documents/${documentId}`);
+      setDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
+      setInfo("Document deleted successfully.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to delete document");
+    } finally {
+      setDeletingDocId(null);
+    }
+  };
+
   return (
-    <DashboardShell title="All Employees" subtitle="Manage employee directory, roles, and workforce overview.">
+    <DashboardShell
+      title={isAdmin ? "All Employees" : "My Profile & Documents"}
+      subtitle={isAdmin ? "Manage employee directory, roles, and workforce overview." : "View your profile and documents."}
+    >
       <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className={`grid gap-3 ${isAdmin ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
           <div className="relative md:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
@@ -176,22 +261,26 @@ const EmployeesPage = () => {
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <select
-            className="input"
-            value={departmentFilter}
-            onChange={(event) => setDepartmentFilter(event.target.value)}
-          >
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </select>
-          <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="All">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+          {isAdmin ? (
+            <select
+              className="input"
+              value={departmentFilter}
+              onChange={(event) => setDepartmentFilter(event.target.value)}
+            >
+              {departments.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {isAdmin ? (
+            <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          ) : null}
         </div>
 
         {loading ? (
@@ -200,10 +289,7 @@ const EmployeesPage = () => {
           </div>
         ) : null}
 
-        {error ? <p className="alert alert-error">{error}</p> : null}
-        {info ? <p className="alert alert-success">{info}</p> : null}
-
-        {!loading && !error ? (
+        {!loading ? (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-700">
@@ -246,23 +332,32 @@ const EmployeesPage = () => {
                       {employee.join_date ? new Date(employee.join_date).toLocaleDateString() : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      <EmployeeStatusRow
-                        employee={employee}
-                        busy={statusUpdatingId === employee.id}
-                        onToggle={() => requestStatusChange(employee)}
-                      />
+                      {isAdmin ? (
+                        <EmployeeStatusRow
+                          employee={employee}
+                          busy={statusUpdatingId === employee.id}
+                          onToggle={() => requestStatusChange(employee)}
+                        />
+                      ) : (
+                        <StatusBadge status={employee.status} />
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <ActionButton icon={<Eye size={14} />} label="View" onClick={() => handleView(employee)} />
-                        <ActionButton icon={<Pencil size={14} />} label="Edit" onClick={() => handleEdit(employee)} />
-                        <ActionButton
-                          icon={<Trash2 size={14} />}
-                          label={deletingId === employee.id ? "Deleting..." : "Delete"}
-                          danger
-                          disabled={deletingId === employee.id}
-                          onClick={() => handleDelete(employee.id)}
-                        />
+                        <ActionButton icon={<FileText size={14} />} label="Docs" onClick={() => openDocumentsModal(employee)} />
+                        {isAdmin ? (
+                          <ActionButton icon={<Pencil size={14} />} label="Edit" onClick={() => handleEdit(employee)} />
+                        ) : null}
+                        {isAdmin ? (
+                          <ActionButton
+                            icon={<Trash2 size={14} />}
+                            label={deletingId === employee.id ? "Deleting..." : "Delete"}
+                            danger
+                            disabled={deletingId === employee.id}
+                            onClick={() => handleDelete(employee.id)}
+                          />
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -279,7 +374,7 @@ const EmployeesPage = () => {
           </div>
         ) : null}
 
-        {!loading && !error && filteredEmployees.length > 0 ? (
+        {!loading && filteredEmployees.length > 0 && isAdmin ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-gray-500">
               Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredEmployees.length)} of{" "}
@@ -418,6 +513,103 @@ const EmployeesPage = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      ) : null}
+
+      {documentsTarget ? (
+        <Modal
+          title={`Documents: ${documentsTarget.name}`}
+          onClose={() => {
+            setDocumentsTarget(null);
+            setDocuments([]);
+          }}
+        >
+          <div className="space-y-4">
+            {isAdmin ? (
+              <form className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3" onSubmit={handleUploadDocument}>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <input
+                    className="input md:col-span-1"
+                    placeholder="Document name"
+                    value={docForm.name}
+                    onChange={(event) => setDocForm((prev) => ({ ...prev, name: event.target.value }))}
+                  />
+                  <input
+                    className="input md:col-span-1"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(event) => setDocForm((prev) => ({ ...prev, file: event.target.files?.[0] || null }))}
+                  />
+                  <button className="btn-action inline-flex items-center justify-center gap-2 md:col-span-1" type="submit" disabled={uploadingDoc}>
+                    <Upload size={14} />
+                    {uploadingDoc ? "Uploading..." : "Upload"}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">Allowed: PDF, JPG, PNG up to 2MB</p>
+              </form>
+            ) : null}
+
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-gray-50 text-gray-700">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Name</th>
+                    <th className="px-3 py-2 font-medium">File URL</th>
+                    <th className="px-3 py-2 font-medium">Upload Date</th>
+                    <th className="px-3 py-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documentsLoading ? (
+                    <tr>
+                      <td className="px-3 py-3 text-gray-500" colSpan={4}>Loading documents...</td>
+                    </tr>
+                  ) : null}
+                  {!documentsLoading &&
+                    documents.map((doc) => (
+                      <tr key={doc.id} className="border-t border-gray-100">
+                        <td className="px-3 py-2">{doc.name}</td>
+                        <td className="px-3 py-2">
+                          <a className="text-blue-600 underline" href={doc.file_url} target="_blank" rel="noreferrer">
+                            {doc.file_url}
+                          </a>
+                        </td>
+                        <td className="px-3 py-2">{new Date(doc.upload_date).toLocaleString()}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <a
+                              className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Download size={14} />
+                              Download
+                            </a>
+                            {isAdmin ? (
+                              <button
+                                className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                type="button"
+                                disabled={deletingDocId === doc.id}
+                                onClick={() => handleDeleteDocument(doc.id)}
+                              >
+                                <Trash2 size={14} />
+                                {deletingDocId === doc.id ? "Deleting..." : "Delete"}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  {!documentsLoading && documents.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-3 text-gray-500" colSpan={4}>No documents found.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </Modal>
       ) : null}
     </DashboardShell>

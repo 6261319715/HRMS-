@@ -31,15 +31,49 @@ const mapDocument = (row) => ({
   size_bytes: row.sizeBytes,
 });
 
-const getDocuments = async (req, res) => {
+const resolveTargetEmployee = async ({ currentUser, requestedEmployeeId, requesterRole }) => {
+  const targetEmployeeId =
+    requesterRole === "admin" && Number.isInteger(requestedEmployeeId) && requestedEmployeeId > 0
+      ? requestedEmployeeId
+      : currentUser.id;
+
+  if (requesterRole !== "admin" && targetEmployeeId !== currentUser.id) {
+    return { error: "Forbidden: insufficient permissions", status: 403 };
+  }
+
+  const targetRows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, targetEmployeeId), eq(users.organizationName, currentUser.organizationName)));
+
+  if (targetRows.length === 0) {
+    return { error: "Employee not found in your organization", status: 404 };
+  }
+
+  return { targetEmployee: targetRows[0] };
+};
+
+const getEmployeeDocuments = async (req, res) => {
   try {
     const currentUser = await getCurrentUser(req.user.id);
     if (!currentUser) return res.status(404).json({ message: "User not found" });
+    const requestedEmployeeId = Number(req.params.employeeId);
+    const { targetEmployee, error, status } = await resolveTargetEmployee({
+      currentUser,
+      requestedEmployeeId,
+      requesterRole: req.user.role,
+    });
+    if (error) return res.status(status).json({ message: error });
 
     const rows = await db
       .select()
       .from(documents)
-      .where(eq(documents.organizationName, currentUser.organizationName))
+      .where(
+        and(
+          eq(documents.organizationName, currentUser.organizationName),
+          eq(documents.uploadedByUserId, targetEmployee.id)
+        )
+      )
       .orderBy(desc(documents.createdAt));
 
     return res.status(200).json({ documents: rows.map(mapDocument) });
@@ -48,7 +82,7 @@ const getDocuments = async (req, res) => {
   }
 };
 
-const uploadDocument = async (req, res) => {
+const uploadEmployeeDocument = async (req, res) => {
   let uploadedFilePath = null;
   try {
     if (!req.file) {
@@ -67,6 +101,16 @@ const uploadDocument = async (req, res) => {
       await fs.unlink(uploadedFilePath).catch(() => {});
       return res.status(404).json({ message: "User not found" });
     }
+    const requestedEmployeeId = Number(req.params.employeeId);
+    const { targetEmployee, error, status } = await resolveTargetEmployee({
+      currentUser,
+      requestedEmployeeId,
+      requesterRole: req.user.role,
+    });
+    if (error) {
+      await fs.unlink(uploadedFilePath).catch(() => {});
+      return res.status(status).json({ message: error });
+    }
 
     const storageKey = getStorageKeyFromFilePath(req.file.filename || req.file.path);
     const fileUrl = buildPublicFileUrl(req, req.file.filename);
@@ -75,7 +119,7 @@ const uploadDocument = async (req, res) => {
       .insert(documents)
       .values({
         organizationName: currentUser.organizationName,
-        uploadedByUserId: currentUser.id,
+        uploadedByUserId: targetEmployee.id,
         name: displayName,
         fileUrl,
         storageKey,
@@ -96,20 +140,36 @@ const uploadDocument = async (req, res) => {
   }
 };
 
-const deleteDocument = async (req, res) => {
+const deleteEmployeeDocument = async (req, res) => {
   try {
+    const requestedEmployeeId = Number(req.params.employeeId);
     const documentId = Number(req.params.id);
+    if (!Number.isInteger(requestedEmployeeId) || requestedEmployeeId <= 0) {
+      return res.status(400).json({ message: "Invalid employee id" });
+    }
     if (!Number.isInteger(documentId) || documentId <= 0) {
       return res.status(400).json({ message: "Invalid document id" });
     }
 
     const currentUser = await getCurrentUser(req.user.id);
     if (!currentUser) return res.status(404).json({ message: "User not found" });
+    const { targetEmployee, error, status } = await resolveTargetEmployee({
+      currentUser,
+      requestedEmployeeId,
+      requesterRole: req.user.role,
+    });
+    if (error) return res.status(status).json({ message: error });
 
     const found = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, documentId), eq(documents.organizationName, currentUser.organizationName)));
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.organizationName, currentUser.organizationName),
+          eq(documents.uploadedByUserId, targetEmployee.id)
+        )
+      );
 
     if (found.length === 0) {
       return res.status(404).json({ message: "Document not found" });
@@ -117,7 +177,13 @@ const deleteDocument = async (req, res) => {
 
     await db
       .delete(documents)
-      .where(and(eq(documents.id, documentId), eq(documents.organizationName, currentUser.organizationName)));
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.organizationName, currentUser.organizationName),
+          eq(documents.uploadedByUserId, targetEmployee.id)
+        )
+      );
 
     const filePath = path.resolve(process.cwd(), "uploads", "documents", found[0].storageKey);
     await fs.unlink(filePath).catch(() => {});
@@ -128,4 +194,4 @@ const deleteDocument = async (req, res) => {
   }
 };
 
-module.exports = { getDocuments, uploadDocument, deleteDocument };
+module.exports = { getEmployeeDocuments, uploadEmployeeDocument, deleteEmployeeDocument };

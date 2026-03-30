@@ -8,7 +8,6 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const payrollRoutes = require("./routes/payrollRoutes");
-const documentsRoutes = require("./routes/documentsRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -71,7 +70,6 @@ app.use("/api", employeeRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payroll", payrollRoutes);
-app.use("/api/documents", documentsRoutes);
 
 const host = process.env.HOST || "0.0.0.0";
 app.listen(PORT, host, () => {

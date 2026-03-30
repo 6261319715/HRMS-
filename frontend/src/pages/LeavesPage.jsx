@@ -15,6 +15,7 @@ import {
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api/apiClient";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const LEAVE_TYPES = ["Casual", "Sick", "Annual", "Other"];
 
@@ -41,6 +42,7 @@ const LeavesPage = () => {
   const [filter, setFilter] = useState("all");
   const [reviewingId, setReviewingId] = useState(null);
   const [adminTab, setAdminTab] = useState("team");
+  useAnnounceFeedback({ error, success: info });
 
   const getAxiosErrorMessage = (err, fallback) =>
     err?.response?.data?.message ||
@@ -200,9 +202,6 @@ const LeavesPage = () => {
           : "Submit a new request and track approvals in one place."
       }
     >
-      {error ? <p className="alert alert-error">{error}</p> : null}
-      {info ? <p className="alert alert-success">{info}</p> : null}
-
       {loading ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 py-16">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />

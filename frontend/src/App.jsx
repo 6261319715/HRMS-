@@ -10,7 +10,6 @@ import PayrollPage from "./pages/PayrollPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
-import DocumentsPage from "./pages/DocumentsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const App = () => {
@@ -37,14 +36,6 @@ const App = () => {
         }
       />
       <Route
-        path="/documents"
-        element={
-          <ProtectedRoute allowedRoles={["admin", "employee"]}>
-            <DocumentsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/dashboard"
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
@@ -63,7 +54,7 @@ const App = () => {
       <Route
         path="/employees"
         element={
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute allowedRoles={["admin", "employee"]}>
             <EmployeesPage />
           </ProtectedRoute>
         }
@@ -71,7 +62,7 @@ const App = () => {
       <Route
         path="/employees/teams"
         element={
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute allowedRoles={["admin", "employee"]}>
             <EmployeesPage />
           </ProtectedRoute>
         }

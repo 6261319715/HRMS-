@@ -26,11 +26,16 @@ const getEmployees = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const orgUsers = await db
-      .select()
-      .from(users)
-      .where(eq(users.organizationName, currentUser.organizationName))
-      .orderBy(desc(users.createdAt));
+    let orgUsers = [];
+    if (req.user.role === "admin") {
+      orgUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.organizationName, currentUser.organizationName))
+        .orderBy(desc(users.createdAt));
+    } else {
+      orgUsers = [currentUser];
+    }
 
     return res.status(200).json({ employees: orgUsers.map(toEmployeeResponse) });
   } catch (error) {

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
+import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const AttendancePage = () => {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ const AttendancePage = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [monthlySummaryRows, setMonthlySummaryRows] = useState([]);
   const [monthlySummaryLoading, setMonthlySummaryLoading] = useState(false);
+  useAnnounceFeedback({ error, success: info });
 
   const loadAttendance = async (date) => {
     setLoading(true);
@@ -202,8 +204,6 @@ const AttendancePage = () => {
             />
           </div>
 
-          {error ? <p className="alert alert-error mt-3">{error}</p> : null}
-          {info ? <p className="alert alert-success mt-3">{info}</p> : null}
           {loading ? <p className="mt-3 text-sm text-gray-500">Loading attendance sheet...</p> : null}
 
           <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
