@@ -3,7 +3,7 @@ import { Eye, Pencil, Trash2, Search, RefreshCw, FileText, Download, Upload } fr
 import DashboardShell from "../components/dashboard/DashboardShell";
 import apiClient from "../api/apiClient";
 import { useAuth } from "../context/AuthContext";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
+import { useToast } from "../context/ToastContext";
 
 const defaultEditForm = {
   name: "",
@@ -14,12 +14,11 @@ const defaultEditForm = {
 };
 
 const EmployeesPage = () => {
+  const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -37,16 +36,14 @@ const EmployeesPage = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState(null);
   const [docForm, setDocForm] = useState({ name: "", file: null });
-  useAnnounceFeedback({ error, success: info });
 
   const loadEmployees = async ({ withLoader = true } = {}) => {
     if (withLoader) setLoading(true);
-    setError("");
     try {
       const response = await apiClient.get("/employees");
       setEmployees(response.data.employees || []);
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load employees");
+      toast.error(err?.response?.data?.message || "Failed to load employees");
     } finally {
       if (withLoader) setLoading(false);
     }
@@ -109,14 +106,12 @@ const EmployeesPage = () => {
     if (!ok) return;
 
     setDeletingId(employeeId);
-    setError("");
-    setInfo("");
     try {
       await apiClient.delete(`/employees/${employeeId}`);
-      setInfo("Employee deleted successfully.");
+      toast.success("Employee deleted successfully.");
       await loadEmployees({ withLoader: false });
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to delete employee");
+      toast.error(err?.response?.data?.message || "Failed to delete employee");
     } finally {
       setDeletingId(null);
     }
@@ -142,16 +137,14 @@ const EmployeesPage = () => {
     setEmployees((prev) =>
       prev.map((e) => (e.id === employee.id ? { ...e, status: nextStatus } : e))
     );
-    setError("");
-    setInfo("");
     setStatusUpdatingId(employee.id);
 
     try {
       await apiClient.put(`/employees/${employee.id}`, { status: nextStatus });
-      setInfo(`Status updated to ${nextStatus}.`);
+      toast.success(`Status updated to ${nextStatus}.`);
     } catch (err) {
       setEmployees(previous);
-      setError(err?.response?.data?.message || "Failed to update status");
+      toast.error(err?.response?.data?.message || "Failed to update status");
     } finally {
       setStatusUpdatingId(null);
     }
@@ -163,15 +156,13 @@ const EmployeesPage = () => {
     if (!editEmployee) return;
 
     setSavingEdit(true);
-    setError("");
-    setInfo("");
     try {
       await apiClient.put(`/employees/${editEmployee.id}`, editForm);
-      setInfo("Employee updated successfully.");
+      toast.success("Employee updated successfully.");
       setEditEmployee(null);
       await loadEmployees({ withLoader: false });
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to update employee");
+      toast.error(err?.response?.data?.message || "Failed to update employee");
     } finally {
       setSavingEdit(false);
     }
@@ -186,7 +177,7 @@ const EmployeesPage = () => {
       const response = await apiClient.get(`/employees/${employee.id}/documents`);
       setDocuments(response.data.documents || []);
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load employee documents");
+      toast.error(err?.response?.data?.message || "Failed to load employee documents");
     } finally {
       setDocumentsLoading(false);
     }
@@ -206,11 +197,10 @@ const EmployeesPage = () => {
     if (!isAdmin || !documentsTarget) return;
     const validationError = validateDocumentInput();
     if (validationError) {
-      setError(validationError);
+      toast.error(validationError);
       return;
     }
     setUploadingDoc(true);
-    setError("");
     try {
       const payload = new FormData();
       payload.append("name", docForm.name.trim());
@@ -220,10 +210,10 @@ const EmployeesPage = () => {
       });
       const refreshed = await apiClient.get(`/employees/${documentsTarget.id}/documents`);
       setDocuments(refreshed.data.documents || []);
-      setInfo("Document uploaded successfully.");
+      toast.success("Document uploaded successfully.");
       setDocForm({ name: "", file: null });
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to upload document");
+      toast.error(err?.response?.data?.message || "Failed to upload document");
     } finally {
       setUploadingDoc(false);
     }
@@ -237,9 +227,9 @@ const EmployeesPage = () => {
     try {
       await apiClient.delete(`/employees/${documentsTarget.id}/documents/${documentId}`);
       setDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
-      setInfo("Document deleted successfully.");
+      toast.success("Document deleted successfully.");
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to delete document");
+      toast.error(err?.response?.data?.message || "Failed to delete document");
     } finally {
       setDeletingDocId(null);
     }
@@ -374,7 +364,7 @@ const EmployeesPage = () => {
           </div>
         ) : null}
 
-        {!loading && filteredEmployees.length > 0 && isAdmin ? (
+        {!loading && !error && filteredEmployees.length > 0 && isAdmin ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-gray-500">
               Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredEmployees.length)} of{" "}

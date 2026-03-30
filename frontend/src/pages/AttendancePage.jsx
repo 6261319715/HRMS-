@@ -3,20 +3,19 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "../api/apiClient";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
+import { useToast } from "../context/ToastContext";
 
 const AttendancePage = () => {
+  const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const navigate = useNavigate();
   const [data, setData] = useState(null);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [rowStatuses, setRowStatuses] = useState({});
   const [savingId, setSavingId] = useState(null);
-  const [info, setInfo] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthlyData, setMonthlyData] = useState(null);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
@@ -24,11 +23,9 @@ const AttendancePage = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [monthlySummaryRows, setMonthlySummaryRows] = useState([]);
   const [monthlySummaryLoading, setMonthlySummaryLoading] = useState(false);
-  useAnnounceFeedback({ error, success: info });
 
   const loadAttendance = async (date) => {
     setLoading(true);
-    setError("");
     try {
       const response = await apiClient.get(`/auth/attendance-sheet?date=${date}`);
       setData(response.data);
@@ -38,7 +35,7 @@ const AttendancePage = () => {
       });
       setRowStatuses(initialStatuses);
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to load attendance sheet");
+      toast.error(err?.response?.data?.message || "Unable to load attendance sheet");
     } finally {
       setLoading(false);
     }
@@ -57,13 +54,12 @@ const AttendancePage = () => {
         setSelectedEmployeeId(String(employees[0].id));
       }
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to load employees");
+      toast.error(err?.response?.data?.message || "Unable to load employees");
     }
   };
 
   const loadMonthlyAttendance = async (nextMonth, employeeIdValue) => {
     setMonthlyLoading(true);
-    setError("");
     try {
       const params = new URLSearchParams({ month: nextMonth });
       if (isAdmin && employeeIdValue) {
@@ -72,7 +68,7 @@ const AttendancePage = () => {
       const response = await apiClient.get(`/auth/attendance/monthly?${params.toString()}`);
       setMonthlyData(response.data);
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to load monthly attendance");
+      toast.error(err?.response?.data?.message || "Unable to load monthly attendance");
     } finally {
       setMonthlyLoading(false);
     }
@@ -85,7 +81,7 @@ const AttendancePage = () => {
       const response = await apiClient.get(`/auth/attendance/monthly/summary?month=${nextMonth}`);
       setMonthlySummaryRows(response.data.rows || []);
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to load monthly summary");
+      toast.error(err?.response?.data?.message || "Unable to load monthly summary");
     } finally {
       setMonthlySummaryLoading(false);
     }
@@ -128,7 +124,7 @@ const AttendancePage = () => {
       link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to download report");
+      toast.error(err?.response?.data?.message || "Unable to download report");
     }
   };
 
@@ -144,16 +140,15 @@ const AttendancePage = () => {
   const handleMarkAttendance = async (userId) => {
     try {
       setSavingId(userId);
-      setInfo("");
       await apiClient.post("/auth/attendance/mark", {
         user_id: userId,
         status: rowStatuses[userId] || "Present",
         attendance_date: selectedDate,
       });
-      setInfo("Attendance updated successfully.");
+      toast.success("Attendance updated successfully.");
       await loadAttendance(selectedDate);
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to update attendance");
+      toast.error(err?.response?.data?.message || "Unable to update attendance");
     } finally {
       setSavingId(null);
     }

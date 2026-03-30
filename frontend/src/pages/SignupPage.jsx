@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import AuthLayout from "../components/AuthLayout";
 import apiClient from "../api/apiClient";
 import { validateSignupForm } from "../utils/authFormValidation";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const initialState = {
   name: "",
@@ -17,14 +17,12 @@ const initialState = {
 const SignupPage = () => {
   const [formData, setFormData] = useState(initialState);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const { toast } = useToast();
   const { signup, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const token = new URLSearchParams(location.search).get("token");
   const isInviteSignup = Boolean(token);
-  useAnnounceFeedback({ error, success });
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -52,9 +50,6 @@ const SignupPage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError("");
-    setSuccess("");
-
     const validation = validateSignupForm(formData, { isInvite: isInviteSignup });
     if (Object.keys(validation).length > 0) {
       setFieldErrors(validation);
@@ -73,7 +68,7 @@ const SignupPage = () => {
           password: payload.password,
           mobile_number: payload.mobile_number,
         });
-        setSuccess("Employee signup successful. Please login.");
+        toast.success("Employee signup successful. Please login.");
       } else {
         await signup({
           name: payload.name,
@@ -82,7 +77,7 @@ const SignupPage = () => {
           organization_name: payload.organization_name,
           mobile_number: payload.mobile_number,
         });
-        setSuccess("Signup successful. Please login.");
+        toast.success("Signup successful. Please login.");
       }
       setTimeout(() => navigate("/login"), 800);
     } catch (err) {
@@ -98,9 +93,8 @@ const SignupPage = () => {
       }
       if (Object.keys(next).length > 0) {
         setFieldErrors(next);
-        setError("");
       } else {
-        setError(data?.message || "Signup failed");
+        toast.error(data?.message || "Signup failed");
       }
     }
   };

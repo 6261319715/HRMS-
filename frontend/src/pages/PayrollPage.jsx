@@ -23,8 +23,8 @@ import {
 } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import apiClient from "../api/apiClient";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const formatInr = (amount) => {
   const n = Number(amount);
@@ -48,14 +48,13 @@ const initialForm = {
 };
 
 const PayrollPage = () => {
+  const { toast } = useToast();
   const { user, fetchProfile } = useAuth();
   const location = useLocation();
   const isAdmin = user?.role === "admin";
   const isPayslipsPath = location.pathname === "/payroll/payslips";
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const [payslips, setPayslips] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [periodFilter, setPeriodFilter] = useState("");
@@ -68,10 +67,8 @@ const PayrollPage = () => {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
-  useAnnounceFeedback({ error, success: info });
 
   const loadPayslips = useCallback(async () => {
-    setError("");
     try {
       if (isAdmin) {
         const params = {};
@@ -84,9 +81,9 @@ const PayrollPage = () => {
         setPayslips(res.data.payslips || []);
       }
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Could not load payslips");
+      toast.error(err?.response?.data?.message || err?.message || "Could not load payslips");
     }
-  }, [isAdmin, periodFilter, statusFilter]);
+  }, [isAdmin, periodFilter, statusFilter, toast]);
 
   const loadAnalytics = useCallback(async () => {
     if (!isAdmin) return;
@@ -163,8 +160,6 @@ const PayrollPage = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setInfo("");
-    setError("");
     try {
       await apiClient.post("/payroll/payslips", {
         user_id: Number(form.user_id),
@@ -176,12 +171,12 @@ const PayrollPage = () => {
         status: form.status,
         notes: form.notes || undefined,
       });
-      setInfo("Payslip saved. Employee is notified.");
+      toast.success("Payslip saved. Employee is notified.");
       setForm(initialForm);
       await loadPayslips();
       await loadAnalytics();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Could not save payslip");
+      toast.error(err?.response?.data?.message || err?.message || "Could not save payslip");
     } finally {
       setSubmitting(false);
     }
@@ -190,13 +185,12 @@ const PayrollPage = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this payslip?")) return;
     setDeletingId(id);
-    setError("");
     try {
       await apiClient.delete(`/payroll/payslips/${id}`);
       await loadPayslips();
       await loadAnalytics();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Could not delete");
+      toast.error(err?.response?.data?.message || err?.message || "Could not delete");
     } finally {
       setDeletingId(null);
     }
@@ -214,14 +208,13 @@ const PayrollPage = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError("Could not download PDF");
+      toast.error("Could not download PDF");
     } finally {
       setPdfLoadingId(null);
     }
   };
 
   const openEdit = async (id) => {
-    setError("");
     try {
       const res = await apiClient.get(`/payroll/payslips/${id}`);
       const p = res.data.payslip;
@@ -235,7 +228,7 @@ const PayrollPage = () => {
         notes: p.notes || "",
       });
     } catch (err) {
-      setError(err?.response?.data?.message || "Could not load payslip");
+      toast.error(err?.response?.data?.message || "Could not load payslip");
     }
   };
 
@@ -243,16 +236,15 @@ const PayrollPage = () => {
     e.preventDefault();
     if (!editId || !editForm) return;
     setEditSaving(true);
-    setError("");
     try {
       await apiClient.patch(`/payroll/payslips/${editId}`, editForm);
       setEditId(null);
       setEditForm(null);
       await loadPayslips();
       await loadAnalytics();
-      setInfo("Payslip updated.");
+      toast.success("Payslip updated.");
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Could not update");
+      toast.error(err?.response?.data?.message || err?.message || "Could not update");
     } finally {
       setEditSaving(false);
     }

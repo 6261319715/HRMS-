@@ -9,7 +9,7 @@ import FooterSection from "../components/landing/FooterSection";
 
 const LandingPage = () => {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-indigo-50">
+    <main className="min-h-dvh bg-gradient-to-b from-blue-50 via-white to-indigo-50">
       <Navbar />
       <HeroSection />
       <FeaturesSection />

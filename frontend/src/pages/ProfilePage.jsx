@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import apiClient from "../api/apiClient";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const ProfilePage = () => {
+  const { toast } = useToast();
   const { user, fetchProfile } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -19,16 +18,14 @@ const ProfilePage = () => {
     new_password: "",
     confirm_password: "",
   });
-  useAnnounceFeedback({ error, success: info });
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      setError("");
       try {
         await fetchProfile();
       } catch (err) {
-        setError(err?.response?.data?.message || "Unable to load profile");
+        toast.error(err?.response?.data?.message || "Unable to load profile");
       } finally {
         setLoading(false);
       }
@@ -48,15 +45,13 @@ const ProfilePage = () => {
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     setSavingProfile(true);
-    setError("");
-    setInfo("");
     try {
       await apiClient.put("/auth/profile", editForm);
       await fetchProfile();
-      setInfo("Profile updated successfully.");
+      toast.success("Profile updated successfully.");
       setEditOpen(false);
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to update profile");
+      toast.error(err?.response?.data?.message || "Failed to update profile");
     } finally {
       setSavingProfile(false);
     }
@@ -65,21 +60,20 @@ const ProfilePage = () => {
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
     setSavingPassword(true);
-    setError("");
-    setInfo("");
     try {
       if (passwordForm.new_password !== passwordForm.confirm_password) {
-        throw new Error("New password and confirm password do not match");
+        toast.error("New password and confirm password do not match");
+        return;
       }
       await apiClient.post("/auth/change-password", {
         current_password: passwordForm.current_password,
         new_password: passwordForm.new_password,
       });
-      setInfo("Password changed successfully.");
+      toast.success("Password changed successfully.");
       setPasswordOpen(false);
       setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Failed to change password");
+      toast.error(err?.response?.data?.message || err.message || "Failed to change password");
     } finally {
       setSavingPassword(false);
     }

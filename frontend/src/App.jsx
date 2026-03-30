@@ -59,14 +59,7 @@ const App = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/employees/teams"
-        element={
-          <ProtectedRoute allowedRoles={["admin", "employee"]}>
-            <EmployeesPage />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/employees/teams" element={<Navigate to="/employees" replace />} />
       <Route
         path="/attendance"
         element={
@@ -94,7 +87,7 @@ const App = () => {
       <Route
         path="/leaves/policy"
         element={
-          <ProtectedRoute allowedRoles={["admin"]}>
+          <ProtectedRoute allowedRoles={["admin", "employee"]}>
             <LeavesPage />
           </ProtectedRoute>
         }
