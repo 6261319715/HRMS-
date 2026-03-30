@@ -10,6 +10,18 @@ const ALLOWED_STATUSES = ["Present", "Late", "Leave"];
 const todayDate = () => new Date().toISOString().split("T")[0];
 const checkInForStatus = (status) => (status === "Leave" ? "-" : status === "Late" ? "09:42 AM" : "09:08 AM");
 const checkOutForStatus = (status) => (status === "Leave" ? "-" : status === "Late" ? "06:37 PM" : "06:18 PM");
+const resolveFrontendBaseUrl = () => {
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.trim().replace(/\/$/, "");
+  if (process.env.CLIENT_URL) return process.env.CLIENT_URL.trim().replace(/\/$/, "");
+  if (process.env.CLIENT_URLS) {
+    const first = process.env.CLIENT_URLS
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)[0];
+    if (first) return first.replace(/\/$/, "");
+  }
+  return "http://localhost:5173";
+};
 
 const getOrganizationUsers = async (organizationName) => {
   return db.select().from(users).where(eq(users.organizationName, organizationName)).orderBy(desc(users.createdAt));
@@ -226,9 +238,13 @@ const markAttendance = async (req, res) => {
 
 const generateInviteLink = async (req, res) => {
   try {
-    const { email } = req.body || {};
+    const rawEmail = req.body?.email;
+    const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
     if (!email) {
       return res.status(400).json({ message: "Recipient email is required" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Invalid recipient email" });
     }
 
     if (!process.env.RESEND_API_KEY) {
@@ -243,7 +259,8 @@ const generateInviteLink = async (req, res) => {
 
     const token = crypto.randomBytes(32).toString("hex");
     createInviteToken({ token, organizationName: currentUser.organizationName });
-    const inviteLink = `http://localhost:5174/signup?token=${token}`;
+    const frontendBaseUrl = resolveFrontendBaseUrl();
+    const inviteLink = `${frontendBaseUrl}/invite-signup?token=${encodeURIComponent(token)}`;
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
