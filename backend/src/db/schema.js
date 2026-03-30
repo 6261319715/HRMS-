@@ -69,6 +69,20 @@ const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  organizationName: varchar("organization_name", { length: 255 }).notNull(),
+  uploadedByUserId: integer("uploaded_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  fileUrl: varchar("file_url", { length: 1000 }).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull().unique(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 const payslips = pgTable(
   "payslips",
   {
@@ -94,4 +108,4 @@ const payslips = pgTable(
   })
 );
 
-module.exports = { users, attendanceRecords, leaveRequests, notifications, payslips };
+module.exports = { users, attendanceRecords, leaveRequests, notifications, documents, payslips };
