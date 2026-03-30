@@ -4,7 +4,7 @@ import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import apiClient from "../api/apiClient";
 import { useNotifications } from "../context/NotificationContext";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
+import { useToast } from "../context/ToastContext";
 
 const formatAgo = (iso) => {
   if (!iso) return "";
@@ -23,24 +23,26 @@ const formatAgo = (iso) => {
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { refreshUnread } = useNotifications();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [items, setItems] = useState([]);
-  useAnnounceFeedback({ error });
 
   const load = useCallback(async () => {
-    setError("");
+    setLoadFailed(false);
     setLoading(true);
     try {
       const res = await apiClient.get("/notifications", { params: { limit: 80 } });
       setItems(res.data.notifications || []);
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "Could not load notifications");
+      const message = err?.response?.data?.message || err?.message || "Could not load notifications";
+      toast.error(message);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     load();
@@ -90,14 +92,14 @@ const NotificationsPage = () => {
           <Loader2 className="animate-spin" size={18} />
           Loading…
         </div>
-      ) : error ? (
-        <div className="rounded-xl border border-dashed border-red-200 bg-red-50/80 px-4 py-8 text-center">
-          <p className="text-sm font-medium text-red-900">Couldn&apos;t load notifications</p>
-          <p className="mt-1 text-xs text-red-800/90">{error}</p>
+      ) : loadFailed ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-10 text-center">
+          <Bell className="mx-auto mb-2 text-gray-400" size={28} />
+          <p className="text-sm font-medium text-gray-700">Could not load notifications</p>
           <button
             type="button"
             onClick={() => load()}
-            className="btn-action mt-4 inline-flex px-4 py-2 text-sm"
+            className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
             Try again
           </button>

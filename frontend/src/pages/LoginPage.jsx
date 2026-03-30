@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import AuthLayout from "../components/AuthLayout";
 import { validateLoginForm } from "../utils/authFormValidation";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
+  const { toast } = useToast();
   const { login, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  useAnnounceFeedback({ error });
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -30,7 +29,6 @@ const LoginPage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError("");
     const trimmed = {
       email: formData.email.trim(),
       password: formData.password,
@@ -44,6 +42,7 @@ const LoginPage = () => {
 
     try {
       const response = await login(trimmed);
+      toast.success("Signed in successfully.");
       const targetPath = response?.user?.role === "employee" ? "/attendance" : "/dashboard";
       navigate(targetPath);
     } catch (err) {
@@ -58,8 +57,9 @@ const LoginPage = () => {
           }
         }
         setFieldErrors((prev) => ({ ...prev, ...next }));
+      } else {
+        toast.error(message || (status === 401 ? "Invalid email or password" : "Login failed"));
       }
-      setError(message || (status === 401 ? "Invalid email or password" : "Login failed"));
     }
   };
 

@@ -1,60 +1,82 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 
 const ToastContext = createContext(null);
 
-const newId = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+const AUTO_REMOVE_MS = 4500;
 
-export function ToastProvider({ children }) {
+let toastId = 0;
+
+export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const timersRef = useRef(new Map());
 
-  const dismiss = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const removeToast = useCallback((id) => {
+    const t = timersRef.current.get(id);
+    if (t) clearTimeout(t);
+    timersRef.current.delete(id);
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const showToast = useCallback((type, message, durationMs = 5200) => {
-    const text = typeof message === "string" ? message.trim() : "";
-    if (!text) return;
-    const id = newId();
-    setToasts((prev) => [...prev, { id, type, message: text }]);
-    if (durationMs > 0) {
-      window.setTimeout(() => dismiss(id), durationMs);
-    }
-  }, [dismiss]);
+  const pushToast = useCallback(
+    (variant, message) => {
+      const text = typeof message === "string" ? message.trim() : "";
+      if (!text) return;
 
-  const value = useMemo(() => ({ showToast, dismiss }), [showToast, dismiss]);
+      const id = ++toastId;
+      setToasts((prev) => [...prev, { id, variant, message: text }]);
+
+      const timer = setTimeout(() => removeToast(id), AUTO_REMOVE_MS);
+      timersRef.current.set(id, timer);
+    },
+    [removeToast]
+  );
+
+  const toast = useMemo(
+    () => ({
+      success: (msg) => pushToast("success", msg),
+      error: (msg) => pushToast("error", msg),
+      info: (msg) => pushToast("info", msg),
+    }),
+    [pushToast]
+  );
+
+  const value = useMemo(() => ({ toast }), [toast]);
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-viewport" aria-live="polite" aria-relevant="additions text">
-        {toasts.map((t) => (
-          <div key={t.id} role="status" className={`toast toast-${t.type}`}>
-            <span className="toast-icon" aria-hidden>
-              {t.type === "success" ? (
-                <CheckCircle2 size={20} strokeWidth={2.25} />
-              ) : t.type === "error" ? (
-                <AlertCircle size={20} strokeWidth={2.25} />
-              ) : (
-                <Info size={20} strokeWidth={2.25} />
-              )}
-            </span>
-            <span className="toast-message">{t.message}</span>
-            <button type="button" className="toast-close" onClick={() => dismiss(t.id)} aria-label="Dismiss">
-              <X size={16} />
+      <div
+        className="toast-viewport"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-atomic="false"
+      >
+        {toasts.map((item) => (
+          <div
+            key={item.id}
+            className={`toast toast--${item.variant}`}
+            role="status"
+          >
+            <p className="toast__text">{item.message}</p>
+            <button
+              type="button"
+              className="toast__dismiss"
+              aria-label="Dismiss notification"
+              onClick={() => removeToast(item.id)}
+            >
+              ×
             </button>
           </div>
         ))}
       </div>
     </ToastContext.Provider>
   );
-}
+};
 
-export function useToast() {
+export const useToast = () => {
   const ctx = useContext(ToastContext);
   if (!ctx) {
     throw new Error("useToast must be used within ToastProvider");
   }
   return ctx;
-}
+};

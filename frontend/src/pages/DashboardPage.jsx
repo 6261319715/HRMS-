@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import apiClient from "../api/apiClient";
 import DashboardShell from "../components/dashboard/DashboardShell";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const DashboardPage = () => {
   const { user, fetchProfile, logout } = useAuth();
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState(null);
   const navigate = useNavigate();
-  useAnnounceFeedback({ error, success: info });
 
   useEffect(() => {
     const load = async () => {
@@ -22,7 +20,7 @@ const DashboardPage = () => {
         const response = await apiClient.get("/auth/dashboard-overview");
         setOverview(response.data);
       } catch (err) {
-        setError(err?.response?.data?.message || "Unable to load dashboard");
+        toast.error(err?.response?.data?.message || "Unable to load dashboard");
       } finally {
         setLoading(false);
       }
@@ -38,8 +36,6 @@ const DashboardPage = () => {
   };
 
   const handleCopyInvite = async () => {
-    setError("");
-    setInfo("");
     try {
       const recipientEmail = window.prompt("Enter employee email for invite:");
       if (!recipientEmail) {
@@ -49,10 +45,10 @@ const DashboardPage = () => {
       const response = await apiClient.post("/auth/invite-link", { email: recipientEmail });
       const inviteLink = response.data.inviteLink;
       await navigator.clipboard.writeText(inviteLink);
-      setInfo("Invite email sent and link copied to clipboard.");
+      toast.success("Invite email sent and link copied to clipboard.");
     } catch (err) {
       const message = err?.response?.data?.message || "Unable to send invite right now.";
-      setError(message);
+      toast.error(message);
     }
   };
 

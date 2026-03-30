@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   CalendarClock,
   CalendarRange,
@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import DashboardShell from "../components/dashboard/DashboardShell";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import apiClient from "../api/apiClient";
-import { useAnnounceFeedback } from "../hooks/useAnnounceFeedback";
 
 const LEAVE_TYPES = ["Casual", "Sick", "Annual", "Other"];
 
@@ -27,6 +27,7 @@ const initialForm = {
 };
 
 const LeavesPage = () => {
+  const { toast } = useToast();
   const { user, fetchProfile } = useAuth();
   const location = useLocation();
   const isPolicy = location.pathname === "/leaves/policy";
@@ -34,15 +35,12 @@ const LeavesPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
   const [form, setForm] = useState(initialForm);
   const [myRequests, setMyRequests] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
   const [filter, setFilter] = useState("all");
   const [reviewingId, setReviewingId] = useState(null);
   const [adminTab, setAdminTab] = useState("team");
-  useAnnounceFeedback({ error, success: info });
 
   const getAxiosErrorMessage = (err, fallback) =>
     err?.response?.data?.message ||
@@ -52,13 +50,12 @@ const LeavesPage = () => {
 
   const loadMyLeaves = async () => {
     setLoading(true);
-    setError("");
     try {
       await fetchProfile();
       const res = await apiClient.get("/leaves/my");
       setMyRequests(res.data.requests || []);
     } catch (err) {
-      setError(getAxiosErrorMessage(err, "Failed to load your leave data"));
+      toast.error(getAxiosErrorMessage(err, "Failed to load your leave data"));
     } finally {
       setLoading(false);
     }
@@ -66,7 +63,6 @@ const LeavesPage = () => {
 
   const loadAdminDashboard = async () => {
     setLoading(true);
-    setError("");
     try {
       await fetchProfile();
       const [allRes, myRes] = await Promise.all([
@@ -76,20 +72,20 @@ const LeavesPage = () => {
       setAllRequests(allRes.data.requests || []);
       setMyRequests(myRes.data.requests || []);
     } catch (err) {
-      setError(getAxiosErrorMessage(err, "Failed to load leave requests"));
+      toast.error(getAxiosErrorMessage(err, "Failed to load leave requests"));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isPolicy && isAdmin) {
+    if (isPolicy) {
       setLoading(false);
       return;
     }
-    if (isAdmin && !isPolicy) {
+    if (isAdmin) {
       loadAdminDashboard();
-    } else if (!isAdmin && !isPolicy) {
+    } else {
       loadMyLeaves();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,8 +94,6 @@ const LeavesPage = () => {
   const handleApply = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    setError("");
-    setInfo("");
     try {
       await apiClient.post("/leaves/apply", {
         leave_type: form.leave_type,
@@ -107,7 +101,7 @@ const LeavesPage = () => {
         end_date: form.end_date,
         reason: form.reason || undefined,
       });
-      setInfo("Leave request submitted successfully.");
+      toast.success("Leave request submitted successfully.");
       setForm(initialForm);
       if (isAdmin) {
         await loadAdminDashboard();
@@ -115,7 +109,7 @@ const LeavesPage = () => {
         await loadMyLeaves();
       }
     } catch (err) {
-      setError(getAxiosErrorMessage(err, "Could not submit leave request"));
+      toast.error(getAxiosErrorMessage(err, "Could not submit leave request"));
     } finally {
       setSubmitting(false);
     }
@@ -138,59 +132,127 @@ const LeavesPage = () => {
     );
     if (!ok) return;
     setReviewingId(id);
-    setError("");
-    setInfo("");
     try {
       await apiClient.patch(`/leaves/${id}/review`, { status });
-      setInfo(`Request ${status}.`);
+      toast.success(`Request ${status}.`);
       await loadAdminDashboard();
     } catch (err) {
-      setError(getAxiosErrorMessage(err, "Could not update request"));
+      toast.error(getAxiosErrorMessage(err, "Could not update request"));
     } finally {
       setReviewingId(null);
     }
   };
 
-  if (isPolicy && isAdmin) {
+  const leavePolicyRows = [
+    {
+      type: "Casual Leave (CL)",
+      description: "For personal or urgent matters",
+      limit: "6–12 days",
+      carry: "Cannot be carried forward",
+    },
+    {
+      type: "Sick Leave (SL)",
+      description: "For illness or medical emergencies",
+      limit: "8–12 days",
+      carry: "Cannot be carried forward",
+    },
+    {
+      type: "Annual Leave (AL/PL)",
+      description: "Planned vacations or personal time",
+      limit: "15–30 days",
+      carry: "Can carry forward / encash",
+    },
+    {
+      type: "Other Leave",
+      description: "Maternity, Paternity, Comp Off, LWP",
+      limit: "As per eligibility",
+      carry: "As per rules",
+    },
+  ];
+
+  const leavePolicyRules = [
+    "Leave requests must be submitted via the HRMS portal.",
+    "Manager approval is required for all leaves.",
+    "Consecutive leaves exceeding 5 days need HR approval.",
+    "Public holidays do not count as leave.",
+    "Misuse of leave may lead to disciplinary action.",
+  ];
+
+  if (isPolicy) {
     return (
       <DashboardShell
-        title="Leave policy"
-        subtitle="Guidelines for your organization — share with your team."
+        title="IIFETECH PVT LTD – Leave policy"
+        subtitle="Leave types, limits, and key rules for all employees."
       >
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50/80 to-white px-6 py-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                <FileText className="h-5 w-5" strokeWidth={2} />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">Organization policy</h3>
-                <p className="mt-0.5 text-sm text-gray-600">
-                  These points help keep leave requests consistent and fair.
-                </p>
+        <div className="space-y-6">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50/80 to-white px-4 py-4 sm:px-6 sm:py-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                  <FileText className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-gray-900">Leave types</h3>
+                  <p className="mt-0.5 text-sm text-gray-600">
+                    Description, annual limits, and carry forward / encashment.
+                  </p>
+                </div>
               </div>
             </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  <tr>
+                    <th className="px-4 py-3 sm:px-6">Leave type</th>
+                    <th className="hidden px-4 py-3 sm:table-cell sm:px-6">Description / eligibility</th>
+                    <th className="px-4 py-3 sm:px-6">Annual limit</th>
+                    <th className="px-4 py-3 sm:px-6">Carry forward / encashment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-800">
+                  {leavePolicyRows.map((row) => (
+                    <tr key={row.type} className="align-top">
+                      <td className="px-4 py-3 font-medium text-gray-900 sm:px-6">{row.type}</td>
+                      <td className="hidden max-w-xs px-4 py-3 text-gray-600 sm:table-cell sm:px-6">
+                        {row.description}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 sm:px-6">{row.limit}</td>
+                      <td className="px-4 py-3 text-gray-700 sm:px-6">{row.carry}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-2 border-t border-gray-100 px-4 py-3 sm:hidden">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Details (mobile)</p>
+              <ul className="space-y-3 text-xs text-gray-600">
+                {leavePolicyRows.map((row) => (
+                  <li key={row.type} className="rounded-lg bg-gray-50 px-3 py-2">
+                    <span className="font-medium text-gray-800">{row.type}</span>
+                    <span className="mt-1 block">{row.description}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <ul className="space-y-0 divide-y divide-gray-100 px-6 py-2">
-            {[
-              "Submit leave requests at least 2 business days in advance when possible.",
-              "Admins review and approve or reject requests for your organization.",
-              "Plan around public holidays and weekends where applicable.",
-              "Contact HR for exceptions or medical leave documentation.",
-            ].map((line, i) => (
-              <li key={i} className="flex gap-3 py-3.5 text-sm text-gray-700">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
+
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-4 py-4 sm:px-6">
+              <h3 className="text-base font-semibold text-gray-900">Key rules</h3>
+              <p className="mt-0.5 text-sm text-gray-600">Everyone must follow these when applying for leave.</p>
+            </div>
+            <ul className="divide-y divide-gray-100 px-4 py-2 sm:px-6">
+              {leavePolicyRules.map((line, i) => (
+                <li key={i} className="flex gap-3 py-3.5 text-sm text-gray-700">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </DashboardShell>
     );
-  }
-
-  if (isPolicy && !isAdmin) {
-    return <Navigate to="/leaves" replace />;
   }
 
   return (

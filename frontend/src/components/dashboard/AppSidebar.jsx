@@ -37,7 +37,7 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
         key: "employees",
         label: "Employees",
         icon: Users,
-        items: role === "admin" ? [{ label: "All Employees", to: "/employees" }, { label: "Teams", to: "/employees/teams" }] : [{ label: "My Documents", to: "/employees" }],
+        items: role === "admin" ? [{ label: "All Employees", to: "/employees" }] : [{ label: "My Documents", to: "/employees" }],
         roles: ["admin", "employee"],
       },
       {
@@ -60,7 +60,10 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
                 { label: "Manage requests", to: "/leaves" },
                 { label: "Leave policy", to: "/leaves/policy" },
               ]
-            : [{ label: "Apply leave", to: "/leaves" }],
+            : [
+                { label: "Apply leave", to: "/leaves" },
+                { label: "Leave policy", to: "/leaves/policy" },
+              ],
         roles: ["admin", "employee"],
       },
       {
@@ -198,10 +201,10 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
   );
 
   return (
-    <>
-      <div className="hidden h-screen lg:block">{sidebarBody}</div>
+    <div className="flex shrink-0 flex-col lg:h-full lg:min-h-0 lg:self-stretch">
+      <div className="hidden h-full min-h-0 lg:block">{sidebarBody}</div>
 
-      <div className="border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
+      <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 lg:hidden">
         <button
           className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm"
           onClick={() => setMobileOpen(true)}
@@ -222,7 +225,7 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
             onClick={() => setMobileOpen(false)}
           >
             <motion.div
-              className="h-full w-72"
+              className="h-full w-[min(18rem,85vw)] max-w-full"
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
@@ -234,7 +237,7 @@ const AppSidebar = ({ mobileOpen, setMobileOpen, desktopCollapsed, setDesktopCol
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 
