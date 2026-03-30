@@ -364,7 +364,7 @@ const EmployeesPage = () => {
           </div>
         ) : null}
 
-        {!loading && !error && filteredEmployees.length > 0 && isAdmin ? (
+        {!loading && filteredEmployees.length > 0 && isAdmin ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-gray-500">
               Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredEmployees.length)} of{" "}
