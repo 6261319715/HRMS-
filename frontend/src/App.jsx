@@ -10,6 +10,7 @@ import PayrollPage from "./pages/PayrollPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
+import DocumentsPage from "./pages/DocumentsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const App = () => {
@@ -32,6 +33,14 @@ const App = () => {
         element={
           <ProtectedRoute allowedRoles={["admin", "employee"]}>
             <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "employee"]}>
+            <DocumentsPage />
           </ProtectedRoute>
         }
       />
